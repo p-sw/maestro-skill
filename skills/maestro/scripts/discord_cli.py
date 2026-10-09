@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Discord server admin CLI: roles, members, categories, channels, channel permissions.
 
-Requires env vars DISCORD_BOT_TOKEN and DISCORD_SERVER_ID. Stdlib only.
+Requires env vars DISCORD_SERVER_ID and MAESTRO_DISCORD_BOT_TOKEN (falls back to
+DISCORD_BOT_TOKEN, which Hermes strips from sandboxed children). Stdlib only.
 All commands print JSON to stdout; errors go to stderr with exit code 1.
 """
 import argparse
@@ -58,11 +59,18 @@ def env(name):
     return val
 
 
+def bot_token():
+    for name in ("MAESTRO_DISCORD_BOT_TOKEN", "DISCORD_BOT_TOKEN"):
+        if os.environ.get(name):
+            return os.environ[name]
+    raise CliError("environment variable MAESTRO_DISCORD_BOT_TOKEN is not set")
+
+
 def request(method, path, body=None, retries=3):
     url = API + path
     data = json.dumps(body).encode() if body is not None else None
     headers = {
-        "Authorization": f"Bot {env('DISCORD_BOT_TOKEN')}",
+        "Authorization": f"Bot {bot_token()}",
         "User-Agent": UA,
         "Content-Type": "application/json",
     }

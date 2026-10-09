@@ -59,4 +59,4 @@ $DCLI channels edit demo --category Archive
 - `@everyone`'s role id equals the server id; the CLI handles this for `@everyone`.
 - Explicit deny beats allow only within the same overwrite; role overwrites are combined and member overwrites win over roles. A channel inside a category does not inherit overwrites automatically unless it was synced, so check `perms show`.
 - Rate limits (429) are retried automatically.
-- If env vars are missing the CLI errors with the variable's name; never print or echo the token.
+- The token is read from `MAESTRO_DISCORD_BOT_TOKEN`, falling back to `DISCORD_BOT_TOKEN` (which Hermes strips from skill commands). If env vars are missing the CLI errors with the variable's name; never print or echo the token.

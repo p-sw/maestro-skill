@@ -32,7 +32,7 @@ skills/maestro/
 
 - Hermes with one multiplexed gateway in the default profile (MAESTRO), Discord connected, and the Hindsight memory provider
 - A `Projects` category in the Discord server; the bot needs Manage Channels and Manage Roles (Server Members Intent for `roles members`)
-- Environment: `DISCORD_BOT_TOKEN`, `DISCORD_SERVER_ID`, `HINDSIGHT_API_URL`, `HINDSIGHT_API_KEY`
+- Environment: `MAESTRO_DISCORD_BOT_TOKEN` (same value as `DISCORD_BOT_TOKEN`, which Hermes does not forward), `DISCORD_SERVER_ID`, `HINDSIGHT_API_URL`, `HINDSIGHT_API_KEY`
 - CLIs: `hermes`, `hindsight`, `gh` (authenticated), `git`, `codex`, `claude`, Python 3.8+
 
 ## Install as a Hermes skill

@@ -5,8 +5,9 @@ version: 1.0.0
 author: p-sw
 platforms: [linux, macos]
 required_environment_variables:
-  - name: DISCORD_BOT_TOKEN
-    prompt: Discord bot token
+  - name: MAESTRO_DISCORD_BOT_TOKEN
+    prompt: Discord bot token (same value as DISCORD_BOT_TOKEN)
+    help: Hermes never forwards DISCORD_BOT_TOKEN to skill commands, so set this copy in the default profile's .env
     required_for: Discord channel, role and permission management
   - name: DISCORD_SERVER_ID
     prompt: Discord server (guild) id
@@ -49,7 +50,7 @@ TPL="${HERMES_SKILL_DIR}/templates"
 HOME_DIR="$HOME/.hermes/profiles/proj-<slug>"               # project profile home
 ```
 
-`DISCORD_BOT_TOKEN`, `DISCORD_SERVER_ID`, `HINDSIGHT_API_URL` and `HINDSIGHT_API_KEY` are already set in the environment. `hermes`, `hindsight`, `gh` (logged in), `git`, `codex` and `claude` are installed. Hermes and Hindsight details are in `references/hermes-hindsight.md`.
+`MAESTRO_DISCORD_BOT_TOKEN`, `DISCORD_SERVER_ID`, `HINDSIGHT_API_URL` and `HINDSIGHT_API_KEY` are declared by this skill, so Hermes passes them to terminal and execute_code when the skill is loaded; they are already set in the environment. `hermes`, `hindsight`, `gh` (logged in), `git`, `codex` and `claude` are installed. Hermes and Hindsight details are in `references/hermes-hindsight.md`.
 
 | Thing | Name |
 |---|---|
