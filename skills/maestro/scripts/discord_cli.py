@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discord server admin CLI: roles, categories, channels, channel permissions.
+"""Discord server admin CLI: roles, members, categories, channels, channel permissions.
 
 Requires env vars DISCORD_BOT_TOKEN and DISCORD_SERVER_ID. Stdlib only.
 All commands print JSON to stdout; errors go to stderr with exit code 1.
@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 
 API = "https://discord.com/api/v10"
-UA = "DiscordBot (https://github.com/maestro/discord-cli, 1.0)"
+UA = "DiscordBot (https://github.com/p-sw/maestro-skill, 1.1)"
 
 CHANNEL_TYPES = {
     "text": 0,
@@ -122,6 +122,21 @@ def parse_perms(spec):
     return bits
 
 
+def parse_color(spec):
+    """'#5865f2' | '5865f2' | '0' -> int."""
+    try:
+        return int(spec.lstrip("#"), 16)
+    except ValueError:
+        raise CliError(f"invalid color '{spec}'; use hex like #5865f2")
+
+
+def normalize_name(name, ctype):
+    """Discord lowercases text-like channel names and turns spaces into hyphens."""
+    if ctype in ("text", "announcement", "forum"):
+        return "-".join(name.lower().split())
+    return name.lower()
+
+
 # ---- lookups -------------------------------------------------------------
 
 def get_roles():
@@ -130,6 +145,26 @@ def get_roles():
 
 def get_channels():
     return request("GET", f"/guilds/{guild()}/channels")
+
+
+_BOT_ID = []
+
+
+def bot_id():
+    if not _BOT_ID:
+        _BOT_ID.append(request("GET", "/users/@me")["id"])
+    return _BOT_ID[0]
+
+
+def get_members():
+    """All guild members (needs the Server Members privileged intent)."""
+    members, after = [], "0"
+    while True:
+        page = request("GET", f"/guilds/{guild()}/members?limit=1000&after={after}")
+        members.extend(page)
+        if len(page) < 1000:
+            return members
+        after = page[-1]["user"]["id"]
 
 
 def resolve(items, ref, kind):
@@ -155,9 +190,11 @@ def resolve_channel(ref, only_type=None):
 
 
 def resolve_target(spec):
-    """'role:<name|id>' | 'member:<user id>' | '@everyone' -> (id, type int)."""
+    """'role:<name|id>' | 'member:<user id>' | '@everyone' | 'bot' -> (id, type int)."""
     if spec in ("@everyone", "everyone"):
         return guild(), 0  # @everyone role id == guild id
+    if spec == "bot":
+        return bot_id(), 1
     kind, _, ref = spec.partition(":")
     if kind == "role" and ref:
         if ref.lower().lstrip("@") == "everyone":
@@ -165,7 +202,16 @@ def resolve_target(spec):
         return resolve(get_roles(), ref, "role")["id"], 0
     if kind in ("member", "user") and ref.isdigit():
         return ref, 1
-    raise CliError("target must be '@everyone', 'role:<name|id>' or 'member:<user_id>'")
+    raise CliError("target must be '@everyone', 'bot', 'role:<name|id>' or 'member:<user_id>'")
+
+
+def member_row(m, roles=None):
+    u = m["user"]
+    row = {"id": u["id"], "username": u["username"],
+           "display_name": m.get("nick") or u.get("global_name") or u["username"]}
+    if roles is not None:
+        row["roles"] = [roles.get(r, r) for r in m.get("roles", [])]
+    return row
 
 
 # ---- commands ------------------------------------------------------------
@@ -181,6 +227,85 @@ def cmd_roles_list(a):
         "id": r["id"], "name": r["name"], "position": r["position"],
         "color": f"#{r['color']:06x}", "managed": r["managed"],
     } for r in roles])
+
+
+def cmd_roles_create(a):
+    same = [r for r in get_roles() if r["name"].lower() == a.name.lower()]
+    if len(same) == 1 and a.exist_ok:
+        return out({"id": same[0]["id"], "name": same[0]["name"], "created": False})
+    if same:
+        ids = ", ".join(r["id"] for r in same)
+        hint = "" if a.exist_ok else "; pass --exist-ok to reuse it"
+        raise CliError(f"role '{a.name}' already exists (ids: {ids}){hint}")
+    body = {"name": a.name, "permissions": str(parse_perms(a.permissions)),
+            "hoist": a.hoist, "mentionable": a.mentionable}
+    if a.color:
+        body["color"] = parse_color(a.color)
+    if a.dry_run:
+        return out({"dry_run": True, "POST": f"/guilds/{guild()}/roles", "body": body})
+    r = request("POST", f"/guilds/{guild()}/roles", body)
+    out({"id": r["id"], "name": r["name"], "created": True})
+
+
+def cmd_roles_edit(a):
+    role = resolve(get_roles(), a.role, "role")
+    body = {}
+    if a.name:
+        body["name"] = a.name
+    if a.color:
+        body["color"] = parse_color(a.color)
+    if a.hoist is not None:
+        body["hoist"] = a.hoist
+    if a.mentionable is not None:
+        body["mentionable"] = a.mentionable
+    if a.permissions is not None:
+        body["permissions"] = str(parse_perms(a.permissions))
+    if not body:
+        raise CliError("nothing to change; pass --name, --color, --[no-]hoist, "
+                       "--[no-]mentionable or --permissions")
+    path = f"/guilds/{guild()}/roles/{role['id']}"
+    if a.dry_run:
+        return out({"dry_run": True, "PATCH": path, "body": body})
+    r = request("PATCH", path, body)
+    out({"id": r["id"], "name": r["name"], "color": f"#{r['color']:06x}",
+         "hoist": r["hoist"], "mentionable": r["mentionable"],
+         "permissions": perm_names(r["permissions"])})
+
+
+def member_role_change(a, method):
+    if not a.user.isdigit():
+        raise CliError("USER must be a numeric Discord user id")
+    role = resolve(get_roles(), a.role, "role")
+    path = f"/guilds/{guild()}/members/{a.user}/roles/{role['id']}"
+    if a.dry_run:
+        return out({"dry_run": True, method: path})
+    request(method, path)
+    out({"role": role["name"], "user": a.user, "assigned": method == "PUT"})
+
+
+def cmd_roles_assign(a):
+    member_role_change(a, "PUT")
+
+
+def cmd_roles_unassign(a):
+    member_role_change(a, "DELETE")
+
+
+def cmd_roles_members(a):
+    role = resolve(get_roles(), a.role, "role")
+    out([member_row(m) for m in get_members() if role["id"] in m.get("roles", [])])
+
+
+def cmd_members_show(a):
+    if not a.user.isdigit():
+        raise CliError("USER must be a numeric Discord user id")
+    m = request("GET", f"/guilds/{guild()}/members/{a.user}")
+    out(member_row(m, {r["id"]: r["name"] for r in get_roles()}))
+
+
+def cmd_bot_whoami(a):
+    u = request("GET", "/users/@me")
+    out({"id": u["id"], "username": u["username"]})
 
 
 def cmd_categories_list(a):
@@ -220,28 +345,76 @@ def cmd_channels_create(a):
     body = {"name": a.name, "type": CHANNEL_TYPES[a.type]}
     if a.type == "category" and a.category:
         raise CliError("a category cannot have a parent category")
+    chans = get_channels()
+    parent_id = None
     if a.category:
-        body["parent_id"] = resolve_channel(a.category, only_type=4)["id"]
+        parent_id = resolve([c for c in chans if c["type"] == 4], a.category, "category")["id"]
+        body["parent_id"] = parent_id
+    wanted = normalize_name(a.name, a.type)
+    same = [c for c in chans if c["type"] == body["type"]
+            and c.get("parent_id") == parent_id and c["name"].lower() == wanted]
+    if len(same) == 1 and a.exist_ok:
+        c = same[0]
+        return out({"id": c["id"], "name": c["name"], "type": TYPE_NAMES.get(c["type"]),
+                    "parent_id": c.get("parent_id"), "created": False})
+    if same:
+        ids = ", ".join(c["id"] for c in same)
+        hint = "" if a.exist_ok else "; pass --exist-ok to reuse it"
+        raise CliError(f"channel '{a.name}' already exists here (ids: {ids}){hint}")
     if a.topic:
         body["topic"] = a.topic
     if a.nsfw:
         body["nsfw"] = True
     if a.private:
-        # Hide from @everyone; optionally grant to roles.
+        # Hide from @everyone; optionally grant to roles, members and this bot.
         view = 1 << PERMISSIONS["VIEW_CHANNEL"]
         overwrites = [{"id": guild(), "type": 0, "allow": "0", "deny": str(view)}]
         roles = get_roles() if a.allow_role else []
         for ref in a.allow_role or []:
             rid = resolve(roles, ref, "role")["id"]
             overwrites.append({"id": rid, "type": 0, "allow": str(view), "deny": "0"})
+        members = list(a.allow_member or [])
+        if a.allow_bot:
+            members.append(bot_id())
+        for uid in members:
+            if not uid.isdigit():
+                raise CliError(f"--allow-member needs a numeric user id, got '{uid}'")
+            overwrites.append({"id": uid, "type": 1, "allow": str(view), "deny": "0"})
         body["permission_overwrites"] = overwrites
-    elif a.allow_role:
-        raise CliError("--allow-role requires --private")
+    elif a.allow_role or a.allow_member or a.allow_bot:
+        raise CliError("--allow-role/--allow-member/--allow-bot require --private")
     if a.dry_run:
         return out({"dry_run": True, "POST": f"/guilds/{guild()}/channels", "body": body})
     c = request("POST", f"/guilds/{guild()}/channels", body)
     out({"id": c["id"], "name": c["name"], "type": TYPE_NAMES.get(c["type"]),
-         "parent_id": c.get("parent_id")})
+         "parent_id": c.get("parent_id"), "created": True})
+
+
+def cmd_channels_edit(a):
+    chans = get_channels()
+    ch = resolve(chans, a.channel, "channel")
+    body = {}
+    if a.name:
+        body["name"] = a.name
+    if a.topic is not None:
+        body["topic"] = a.topic
+    if a.category and a.no_category:
+        raise CliError("use either --category or --no-category")
+    if a.category:
+        if ch["type"] == 4:
+            raise CliError("a category cannot have a parent category")
+        body["parent_id"] = resolve([c for c in chans if c["type"] == 4],
+                                    a.category, "category")["id"]
+    if a.no_category:
+        body["parent_id"] = None
+    if not body:
+        raise CliError("nothing to change; pass --name, --topic, --category or --no-category")
+    path = f"/channels/{ch['id']}"
+    if a.dry_run:
+        return out({"dry_run": True, "PATCH": path, "body": body})
+    c = request("PATCH", path, body)
+    out({"id": c["id"], "name": c["name"], "type": TYPE_NAMES.get(c["type"]),
+         "parent_id": c.get("parent_id"), "topic": c.get("topic")})
 
 
 def cmd_perms_show(a):
@@ -299,10 +472,52 @@ def build_parser():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="group", required=True)
 
-    roles = sub.add_parser("roles", help="role queries").add_subparsers(dest="cmd", required=True)
+    roles = sub.add_parser("roles", help="role queries/management").add_subparsers(dest="cmd", required=True)
     r = roles.add_parser("list", help="list roles (highest position first)")
     r.add_argument("--permissions", action="store_true", help="include permission names")
     r.set_defaults(fn=cmd_roles_list)
+
+    r = roles.add_parser("create", help="create a role (no server-wide permissions by default)")
+    r.add_argument("name")
+    r.add_argument("--color", help="hex color such as #5865f2")
+    r.add_argument("--hoist", action="store_true", help="show separately in the member list")
+    r.add_argument("--mentionable", action="store_true")
+    r.add_argument("--permissions", default="", help="server-wide permission names (default none)")
+    r.add_argument("--exist-ok", action="store_true", help="reuse a role with the same name")
+    r.add_argument("--dry-run", action="store_true")
+    r.set_defaults(fn=cmd_roles_create)
+
+    r = roles.add_parser("edit", help="rename or restyle a role")
+    r.add_argument("role", help="role name or id")
+    r.add_argument("--name")
+    r.add_argument("--color", help="hex color such as #5865f2")
+    r.add_argument("--hoist", dest="hoist", action="store_const", const=True)
+    r.add_argument("--no-hoist", dest="hoist", action="store_const", const=False)
+    r.add_argument("--mentionable", dest="mentionable", action="store_const", const=True)
+    r.add_argument("--no-mentionable", dest="mentionable", action="store_const", const=False)
+    r.add_argument("--permissions", help="replace server-wide permissions ('' or 0 clears)")
+    r.add_argument("--dry-run", action="store_true")
+    r.set_defaults(fn=cmd_roles_edit)
+
+    for name, fn, what in (("assign", cmd_roles_assign, "give a role to a member"),
+                           ("unassign", cmd_roles_unassign, "take a role from a member")):
+        r = roles.add_parser(name, help=what)
+        r.add_argument("role", help="role name or id")
+        r.add_argument("user", help="Discord user id")
+        r.add_argument("--dry-run", action="store_true")
+        r.set_defaults(fn=fn)
+
+    r = roles.add_parser("members", help="list members holding a role (Server Members intent)")
+    r.add_argument("role", help="role name or id")
+    r.set_defaults(fn=cmd_roles_members)
+
+    mem = sub.add_parser("members", help="member queries").add_subparsers(dest="cmd", required=True)
+    m = mem.add_parser("show", help="show a member and their roles")
+    m.add_argument("user", help="Discord user id")
+    m.set_defaults(fn=cmd_members_show)
+
+    bot = sub.add_parser("bot", help="the bot itself").add_subparsers(dest="cmd", required=True)
+    bot.add_parser("whoami", help="print the bot's user id and name").set_defaults(fn=cmd_bot_whoami)
 
     cats = sub.add_parser("categories", help="category queries").add_subparsers(dest="cmd", required=True)
     cats.add_parser("list", help="list categories").set_defaults(fn=cmd_categories_list)
@@ -322,8 +537,23 @@ def build_parser():
     c.add_argument("--private", action="store_true", help="hide from @everyone")
     c.add_argument("--allow-role", action="append", metavar="ROLE",
                    help="with --private: role (name/id) that may view; repeatable")
+    c.add_argument("--allow-member", action="append", metavar="USER_ID",
+                   help="with --private: member that may view; repeatable")
+    c.add_argument("--allow-bot", action="store_true",
+                   help="with --private: keep this bot able to view the channel")
+    c.add_argument("--exist-ok", action="store_true",
+                   help="reuse a same-named channel of this type in the same category")
     c.add_argument("--dry-run", action="store_true")
     c.set_defaults(fn=cmd_channels_create)
+
+    c = ch.add_parser("edit", help="rename, retopic or move a channel")
+    c.add_argument("channel", help="channel name or id")
+    c.add_argument("--name")
+    c.add_argument("--topic", help="new topic ('' clears it)")
+    c.add_argument("--category", help="move under this category (name or id)")
+    c.add_argument("--no-category", action="store_true", help="move out of any category")
+    c.add_argument("--dry-run", action="store_true")
+    c.set_defaults(fn=cmd_channels_edit)
 
     pm = sub.add_parser("perms", help="channel permission overwrites").add_subparsers(dest="cmd", required=True)
     s = pm.add_parser("show", help="show overwrites on a channel")
@@ -332,7 +562,7 @@ def build_parser():
 
     s = pm.add_parser("set", help="set allow/deny for a role or member (merges by default)")
     s.add_argument("channel", help="channel name or id")
-    s.add_argument("target", help="@everyone | role:<name|id> | member:<user_id>")
+    s.add_argument("target", help="@everyone | bot | role:<name|id> | member:<user_id>")
     s.add_argument("--allow", default="", help="comma-separated permission names")
     s.add_argument("--deny", default="", help="comma-separated permission names")
     s.add_argument("--replace", action="store_true",
