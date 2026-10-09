@@ -281,6 +281,27 @@ def cmd_render(a):
          "backup": str(backup) if backup else None})
 
 
+# ---- credentials ----------------------------------------------------------------------
+
+def cmd_copy_env(a):
+    """Copy .env values from one profile to another without printing them."""
+    copied, skipped = [], []
+    for key in a.keys:
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
+            raise CliError(f"'{key}' is not an UPPER_SNAKE env name")
+        if key in a.deny or key.startswith(("DISCORD_", "TELEGRAM_", "SLACK_", "GATEWAY_")):
+            raise CliError(f"refusing to copy messaging/gateway setting {key} into a project profile")
+        value = config_get(a.src, key, as_json=False)
+        if not value:
+            skipped.append(key)
+            continue
+        if not a.dry_run:
+            config_set(a.dest, key, value)
+        copied.append(key)
+    out({"from": a.src, "to": a.dest, "copied": copied, "not_set_in_source": skipped,
+         "dry_run": a.dry_run})
+
+
 # ---- status ------------------------------------------------------------------------
 
 def git(path, *args):
@@ -381,6 +402,14 @@ def build_parser():
     r.add_argument("--force", action="store_true", help="overwrite non-empty DEST (keeps a backup)")
     r.add_argument("--dry-run", action="store_true", help="print instead of writing")
     r.set_defaults(fn=cmd_render)
+
+    r = sub.add_parser("copy-env", help="copy .env keys between profiles without printing them")
+    r.add_argument("dest", help="profile to write to")
+    r.add_argument("keys", nargs="+", metavar="KEY")
+    r.add_argument("--from", dest="src", default="default", help="profile to read from")
+    r.add_argument("--deny", nargs="*", default=[], help=argparse.SUPPRESS)
+    r.add_argument("--dry-run", action="store_true")
+    r.set_defaults(fn=cmd_copy_env)
 
     r = sub.add_parser("status", help="summarise project profiles")
     r.add_argument("profile", nargs="?", help="one profile (default: all matching --prefix)")
