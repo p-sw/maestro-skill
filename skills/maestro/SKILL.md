@@ -59,7 +59,7 @@ HOME_DIR="$HOME/.hermes/profiles/proj-<slug>"               # project profile ho
 | Workspace | `<profile home>/workspace` |
 | Hindsight bank | `proj-<slug>` (MAESTRO's own bank is `maestro-registry`) |
 | Discord role / channel / route | role `proj-<slug>`, channel `#<slug>` in category `Projects`, route `proj-<slug>` |
-| Base distribution | `$TPL/distribution` (installed with `hermes profile install`; no memories, no `.env`, no MAESTRO skill) |
+| Base distribution | `github.com/p-sw/maestro-project-agent` (installed with `hermes profile install`; no memories, no `.env`, no MAESTRO skill) |
 
 ## Ground rules
 
@@ -84,13 +84,13 @@ hindsight -o json bank list
 gh auth status; codex --version; claude --version
 ```
 
-Make sure the slug is unused across profiles, banks, roles, channels and routes, the `Projects` category exists, and `$TPL/distribution/distribution.yaml` exists. For a repository, also run `gh repo view <owner>/<repo> --json nameWithOwner,owner,defaultBranchRef,isPrivate,description` and `gh repo view <fork-owner>/<repo>` (an existing fork can be reused). Then present the plan (ground rule 1).
+Make sure the slug is unused across profiles, banks, roles, channels and routes, the `Projects` category exists, and `gh repo view p-sw/maestro-project-agent` succeeds. For a repository, also run `gh repo view <owner>/<repo> --json nameWithOwner,owner,defaultBranchRef,isPrivate,description` and `gh repo view <fork-owner>/<repo>` (an existing fork can be reused). Then present the plan (ground rule 1).
 
 ### Phase 1 — project agent
 
 1. **Profile**
    ```bash
-   hermes profile install "$TPL/distribution" --name proj-<slug> --yes
+   hermes profile install github.com/p-sw/maestro-project-agent --name proj-<slug> --yes
    hermes profile describe proj-<slug> --text "<Project name>: <brief>"
    hermes profile info proj-<slug>      # shows the distribution, its version and required env vars
    hermes -p proj-<slug> config path    # expect $HOME_DIR/config.yaml
@@ -235,7 +235,7 @@ Keep the profile, bank and route so history stays readable. Update the registry 
 
 ## Workflow E — maintain the base distribution
 
-New project profiles are installed from `templates/distribution` (a Hermes profile distribution). To change what every future project starts with (default config, shipped skills, required env vars), edit that directory in this skill, bump `version` in `distribution.yaml`, and reinstall the skill. Existing projects are not touched. To roll a change into one existing project run `hermes profile update proj-<slug>`; its `config.yaml`, SOUL.md, memories and `.env` are preserved (pass `--force-config` only if the owner wants the shipped config applied). Check which version a project runs with `hermes profile info proj-<slug>`.
+New project profiles are installed from the `github.com/p-sw/maestro-project-agent` repository (a Hermes profile distribution; source in https://github.com/p-sw/maestro-project-agent). To change what every future project starts with (default config, shipped skills, required env vars), change that repository, bump `version` in `distribution.yaml` and push. Existing projects are not touched. To roll a change into one existing project run `hermes profile update proj-<slug>`; its `config.yaml`, SOUL.md, memories and `.env` are preserved (pass `--force-config` only if the owner wants the shipped config applied). Check which version a project runs with `hermes profile info proj-<slug>`.
 
 ## Workflow F — other Discord administration
 

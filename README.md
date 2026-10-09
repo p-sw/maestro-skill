@@ -22,8 +22,7 @@ skills/maestro/
 │   └── maestro_ctl.py           # profile_routes, .env id lists, Hindsight config, templates, status
 ├── templates/
 │   ├── project-SOUL.md          # standing rules for every project agent
-│   ├── project-MEMORY.md        # seeded repository facts
-│   └── distribution/            # Hermes profile distribution every project profile is installed from
+│   └── project-MEMORY.md        # seeded repository facts
 └── references/
     ├── discord-cli.md
     └── hermes-hindsight.md
@@ -34,6 +33,7 @@ skills/maestro/
 - Hermes with one multiplexed gateway in the default profile (MAESTRO), Discord connected, and the Hindsight memory provider
 - A `Projects` category in the Discord server; the bot needs Manage Channels and Manage Roles (Server Members Intent for `roles members`)
 - Environment: `MAESTRO_DISCORD_BOT_TOKEN` (same value as `DISCORD_BOT_TOKEN`, which Hermes does not forward), `DISCORD_SERVER_ID`, `HINDSIGHT_API_URL`, `HINDSIGHT_API_KEY`
+- Project profiles are installed from the [maestro-project-agent](https://github.com/p-sw/maestro-project-agent) distribution (needs `git` and GitHub access)
 - CLIs: `hermes`, `hindsight`, `gh` (authenticated), `git`, `codex`, `claude`, Python 3.8+
 
 ## Install as a Hermes skill
