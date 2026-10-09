@@ -60,9 +60,9 @@ def env(name):
 
 
 def bot_token():
-    for name in ("MAESTRO_DISCORD_BOT_TOKEN", "DISCORD_BOT_TOKEN"):
-        if os.environ.get(name):
-            return os.environ[name]
+    token = os.environ.get("MAESTRO_DISCORD_BOT_TOKEN") or os.environ.get("DISCORD_BOT_TOKEN")
+    if token:
+        return token
     raise CliError("environment variable MAESTRO_DISCORD_BOT_TOKEN is not set")
 
 
