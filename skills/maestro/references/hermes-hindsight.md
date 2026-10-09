@@ -62,3 +62,4 @@ Uses `HINDSIGHT_API_URL` and `HINDSIGHT_API_KEY` from the environment. Add `-o j
 | Delete bank (irreversible) | `hindsight bank delete <bank_id> -y` |
 
 - Per-profile Discord behaviour lives in the profile's `config.yaml`: `discord.require_mention` and `discord.auto_thread` (a served profile's values stay with that profile and are not bridged into the default profile's environment). Project agents run with `require_mention: true`, `auto_thread: false`.
+- Web search backend is a profile setting: `web.backend: tavily` in `config.yaml` (set for every project agent); `TAVILY_API_KEY` in the profile's `.env` raises the limits, and Tavily also works keyless once selected. Once `web.backend` is set, adding other keys does not change the route.

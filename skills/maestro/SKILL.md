@@ -101,6 +101,11 @@ Make sure the slug is unused across profiles, banks, roles, channels and routes,
    $CTL copy-env proj-<slug> HINDSIGHT_API_KEY HINDSIGHT_API_URL <PROVIDER_API_KEY>   # values are never printed
    hermes -p proj-<slug> skills list | grep -E 'codex|claude-code|github'
    ```
+   Web search of the project agent is Tavily (`web_search` / `web_extract`). Copy the key too if the default profile has one; Tavily also works keyless with lower limits:
+   ```bash
+   hermes -p proj-<slug> config set web.backend tavily
+   $CTL copy-env proj-<slug> TAVILY_API_KEY   # reports it under not_set_in_source when there is none; that is fine
+   ```
    Discord behaviour of the project agent: the bot must be @mentioned and must not open threads.
    ```bash
    hermes -p proj-<slug> config set discord.require_mention true
