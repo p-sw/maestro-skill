@@ -34,7 +34,7 @@ Facts MAESTRO relies on. Hermes and Hindsight move fast; when a command errors, 
   ```
 
   Match score: `user_id` 16, `thread_id` 8, `chat_id` 4, `guild_id` 2; the most specific wins. Unmatched traffic stays with the default profile (MAESTRO). A route whose target profile is missing is rejected, not sent to MAESTRO. Manage it with `maestro_ctl.py routes ...`.
-- Authorization for routed messages is decided by the receiving bot's profile (the default one): `DISCORD_ALLOWED_USERS` / `DISCORD_ALLOWED_ROLES` in `~/.hermes/.env`. The routed profile needs no allowlist of its own.
+- Authorization for routed messages is decided by the receiving bot's profile (the default one): `DISCORD_ALLOWED_USERS` / `DISCORD_ALLOWED_ROLES` in the default profile's `.env`. The routed profile needs no allowlist of its own.
 - Useful Discord `.env` lists (comma-separated ids, default profile): `DISCORD_ALLOWED_USERS`, `DISCORD_ALLOWED_ROLES`, `DISCORD_FREE_RESPONSE_CHANNELS` (answer without @mention), `DISCORD_IGNORED_CHANNELS`, `DISCORD_NO_THREAD_CHANNELS`. Manage them with `maestro_ctl.py env-list ...`.
 
 ## Hindsight memory provider (Hermes plugin)
