@@ -22,7 +22,8 @@ skills/maestro/
 │   └── maestro_ctl.py           # profile_routes, .env id lists, Hindsight config, templates, status
 ├── templates/
 │   ├── project-SOUL.md          # standing rules for every project agent
-│   └── project-MEMORY.md        # seeded repository facts
+│   ├── project-MEMORY.md        # seeded repository facts
+│   └── distribution/            # Hermes profile distribution every project profile is installed from
 └── references/
     ├── discord-cli.md
     └── hermes-hindsight.md

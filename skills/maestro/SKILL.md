@@ -59,7 +59,7 @@ HOME_DIR="$HOME/.hermes/profiles/proj-<slug>"               # project profile ho
 | Workspace | `<profile home>/workspace` |
 | Hindsight bank | `proj-<slug>` (MAESTRO's own bank is `maestro-registry`) |
 | Discord role / channel / route | role `proj-<slug>`, channel `#<slug>` in category `Projects`, route `proj-<slug>` |
-| Template profile | `_template` (empty memories, no MAESTRO skill) |
+| Base distribution | `$TPL/distribution` (installed with `hermes profile install`; no memories, no `.env`, no MAESTRO skill) |
 
 ## Ground rules
 
@@ -84,16 +84,25 @@ hindsight -o json bank list
 gh auth status; codex --version; claude --version
 ```
 
-Make sure the slug is unused across profiles, banks, roles, channels and routes, the `Projects` category exists, and the `_template` profile exists (otherwise run Workflow E first). For a repository, also run `gh repo view <owner>/<repo> --json nameWithOwner,owner,defaultBranchRef,isPrivate,description` and `gh repo view <fork-owner>/<repo>` (an existing fork can be reused). Then present the plan (ground rule 1).
+Make sure the slug is unused across profiles, banks, roles, channels and routes, the `Projects` category exists, and `$TPL/distribution/distribution.yaml` exists. For a repository, also run `gh repo view <owner>/<repo> --json nameWithOwner,owner,defaultBranchRef,isPrivate,description` and `gh repo view <fork-owner>/<repo>` (an existing fork can be reused). Then present the plan (ground rule 1).
 
 ### Phase 1 — project agent
 
 1. **Profile**
    ```bash
-   hermes profile create proj-<slug> --clone-from _template --description "<Project name>: <brief>"
+   hermes profile install "$TPL/distribution" --name proj-<slug> --yes
+   hermes profile describe proj-<slug> --text "<Project name>: <brief>"
+   hermes profile info proj-<slug>      # shows the distribution, its version and required env vars
    hermes -p proj-<slug> config path    # expect $HOME_DIR/config.yaml
    ```
-2. **Internal markdown files.** Render `SOUL.md`, the project agent's standing rules, then make sure no memories came along from the template:
+   The distribution (official Hermes mechanism for reusable profiles) installs only the base config and never copies memories, sessions or `.env`, so nothing leaks from MAESTRO. Give the profile its model and keys explicitly:
+   ```bash
+   for k in model.provider model.default; do hermes -p proj-<slug> config set $k "$(hermes config get $k --raw)"; done
+   $CTL copy-env proj-<slug> HINDSIGHT_API_KEY HINDSIGHT_API_URL <PROVIDER_API_KEY>   # values are never printed
+   hermes -p proj-<slug> skills list | grep -E 'codex|claude-code|github'
+   ```
+   `<PROVIDER_API_KEY>` is the key of the provider in `model.provider` (for example `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`); OAuth logins (Anthropic, Codex) are shared from the root `auth.json` and need no copy. If a skill is missing, run `hermes update` (it syncs bundled skills to every profile) and re-check. Verify the profile answers: `hermes -p proj-<slug> chat -q "reply with OK"`.
+2. **Internal markdown files.** Render `SOUL.md`, the project agent's standing rules, then make sure the memory files exist and are empty:
    ```bash
    $CTL render $TPL/project-SOUL.md "$HOME_DIR/SOUL.md" --force \
      --var project_name="<Project name>" --var slug=<slug> --var brief="<brief>" \
@@ -224,19 +233,9 @@ Keep the profile, bank and route so history stays readable. Update the registry 
 4. Only if the owner asks to erase memory: `hindsight bank delete proj-<slug> -y`.
 5. Ask the owner to delete the channel and role in Discord, and the fork on GitHub if they want.
 
-## Workflow E — bootstrap or repair `_template`
+## Workflow E — maintain the base distribution
 
-Project profiles are cloned from `_template` so they inherit the model, provider keys, the Hindsight plugin and bundled skills, without MAESTRO's memories, identity or powers.
-
-```bash
-hermes profile create _template --clone-from default --description "Template for MAESTRO project agents"
-T="$HOME/.hermes/profiles/_template"
-: > "$T/memories/MEMORY.md"; : > "$T/memories/USER.md"; : > "$T/SOUL.md"
-hermes -p _template skills uninstall maestro || hermes -p _template config set skills.disabled '["maestro"]'
-$CTL hindsight-config _template --bank-id TEMPLATE_UNSET
-hermes -p _template config get memory.provider; hermes -p _template skills list | grep -E 'codex|claude-code|github'
-```
-Cloning never copies messaging settings, so the template has no Discord token, allowlist or routes. If `_template` already exists, check the same things: empty memories, no `maestro` skill, `bank_id` `TEMPLATE_UNSET`, provider `hindsight`.
+New project profiles are installed from `templates/distribution` (a Hermes profile distribution). To change what every future project starts with (default config, shipped skills, required env vars), edit that directory in this skill, bump `version` in `distribution.yaml`, and reinstall the skill. Existing projects are not touched. To roll a change into one existing project run `hermes profile update proj-<slug>`; its `config.yaml`, SOUL.md, memories and `.env` are preserved (pass `--force-config` only if the owner wants the shipped config applied). Check which version a project runs with `hermes profile info proj-<slug>`.
 
 ## Workflow F — other Discord administration
 
@@ -245,8 +244,8 @@ For requests that are not about a project (view or restructure channels, categor
 ## Pitfalls
 
 - `bank_id_template` in a Hindsight config overrides `bank_id`; `$CTL hindsight-config --bank-id` removes it. A project profile must never read or write `maestro-registry` or another project's bank.
-- `hermes profile create --clone-from default` for a project would copy MAESTRO's SOUL, memories, this skill and its bank settings. Always clone from `_template`.
-- Under the multiplexed gateway, a project profile only sees its own `.env`. If the project agent cannot reach its model or Hindsight, the key is missing from `<profile home>/.env`; fix `_template` and copy the key into the project with `hermes -p proj-<slug> config set KEY "$KEY"`.
+- Never create a project profile with `--clone`, `--clone-from default` or `--clone-all`: that copies MAESTRO's SOUL, memories, this skill and its Hindsight config. Always install the base distribution.
+- Under the multiplexed gateway, a project profile only sees its own `.env`. If the project agent cannot reach its model or Hindsight, the key is missing from `<profile home>/.env`; copy it with `$CTL copy-env proj-<slug> KEY`.
 - `gh repo clone` into a non-empty `workspace/` fails; check first and never delete an existing workspace without asking.
 - If forking is refused (private repository, organisation policy, own repository), fall back to a direct clone as described in Phase 2; do not create branches yourself.
 - MEMORY.md is capped at 2,200 characters; keep the seeded entries short.
