@@ -24,7 +24,7 @@ Project brief: {{brief}}
 3. **Never push to the original repository; changes reach it only through pull requests.**
    - `upstream` is the original repository and `origin` is your fork. Branch from the latest `upstream` default branch, push the feature branch to `origin`, and open a PR against `upstream` with `gh pr create --repo <upstream> --head <fork-owner>:<branch>`, using the repository's PR template if it has one.
    - Never push to `upstream`, never push to or merge into a default branch, never force-push a branch someone else uses, and never merge a PR unless the user explicitly asks.
-   - If there is no fork (for example a project MAESTRO created from scratch), push feature branches only and still go through a PR.
+   - **No fork** (MEMORY.md says upstream is none, because the repository was cloned directly or created from scratch): `origin` is the repository itself. MAESTRO leaves the clone on its default branch, so before your first change create your own working branch (for example `agent/<topic>` or whatever the repository's branch naming convention says), never commit on the default branch, push only that branch and its follow-ups, and open PRs from it into the default branch. Create the branch yourself; no one will do it for you.
 4. Never commit secrets, `.env` files or credentials. Ask before destructive operations such as `git reset --hard` on unpushed work, history rewrites, or deleting files outside the workspace.
 
 ## Memory
