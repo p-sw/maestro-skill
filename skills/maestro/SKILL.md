@@ -101,6 +101,11 @@ Make sure the slug is unused across profiles, banks, roles, channels and routes,
    $CTL copy-env proj-<slug> HINDSIGHT_API_KEY HINDSIGHT_API_URL <PROVIDER_API_KEY>   # values are never printed
    hermes -p proj-<slug> skills list | grep -E 'codex|claude-code|github'
    ```
+   Discord behaviour of the project agent: the bot must be @mentioned and must not open threads.
+   ```bash
+   hermes -p proj-<slug> config set discord.require_mention true
+   hermes -p proj-<slug> config set discord.auto_thread false
+   ```
    `<PROVIDER_API_KEY>` is the key of the provider in `model.provider` (for example `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`); OAuth logins (Anthropic, Codex) are shared from the root `auth.json` and need no copy. If a skill is missing, run `hermes update` (it syncs bundled skills to every profile) and re-check. Verify the profile answers: `hermes -p proj-<slug> chat -q "reply with OK"`.
 2. **Internal markdown files.** Render `SOUL.md`, the project agent's standing rules, then make sure the memory files exist and are empty:
    ```bash
@@ -132,7 +137,7 @@ Make sure the slug is unused across profiles, banks, roles, channels and routes,
      --private --allow-role proj-<slug> --allow-bot --exist-ok
    $DCLI roles assign proj-<slug> <user_id>            # once per member, owner included
    $CTL env-list add DISCORD_ALLOWED_USERS <user_id>...  # members who may talk to the bot
-   $CTL env-list add DISCORD_FREE_RESPONSE_CHANNELS <channel_id>   # answer without @mention (default; skip if the owner prefers mentions)
+   $CTL env-list add DISCORD_NO_THREAD_CHANNELS <channel_id>   # answer in the channel itself, no auto thread
    $DCLI perms show <channel_id>
    ```
    Note the channel id and role id from the JSON output.
@@ -198,7 +203,8 @@ Update the `maestro-registry` record (same `--doc-id project-<slug>`) with the r
 | Add a member | `$DCLI roles assign proj-<slug> <id>`, `$CTL env-list add DISCORD_ALLOWED_USERS <id>`, restart. |
 | Remove a member | `$DCLI roles unassign proj-<slug> <id>`. Remove them from `DISCORD_ALLOWED_USERS` only if no other `proj-*` role still lists them (`$DCLI members show <id>`) and they are not the owner; restart. |
 | Rename the channel | `$DCLI channels edit <channel> --name <new>`. The route uses the id, so it keeps working; re-render SOUL.md with the new `channel_name`. |
-| Mention-free replies on/off | `$CTL env-list add|remove DISCORD_FREE_RESPONSE_CHANNELS <channel_id>`, restart. |
+| Mention-free replies on (default is @mention required) | `$CTL env-list add DISCORD_FREE_RESPONSE_CHANNELS <channel_id>` and `hermes -p proj-<slug> config set discord.require_mention false`, restart. Off again: remove the channel from the list and set `discord.require_mention true`. |
+| Auto threads on/off (default off) | `hermes -p proj-<slug> config set discord.auto_thread true|false`; `$CTL env-list remove|add DISCORD_NO_THREAD_CHANNELS <channel_id>`, restart. |
 | Pause a project | `$DCLI perms set <channel> role:proj-<slug> --deny SEND_MESSAGES`; resume with `--allow SEND_MESSAGES`. (Disabling the route instead would hand the channel to MAESTRO.) |
 | Memory focus | `hindsight bank set-config proj-<slug> --retain-mission "..."` / `--observations-mission "..."` |
 | Attach a repository later | Phase 2 of Workflow A. |
@@ -228,7 +234,7 @@ Keep the profile, bank and route so history stays readable. Update the registry 
 
 **Delete (irreversible; ground rule 4, confirm each item separately):**
 1. Check the workspace for unpushed work: `git -C <ws> status`, `git -C <ws> log --branches --not --remotes --oneline`.
-2. `$CTL routes remove proj-<slug>`, `$CTL env-list remove DISCORD_FREE_RESPONSE_CHANNELS <channel_id>`, restart.
+2. `$CTL routes remove proj-<slug>`, `$CTL env-list remove DISCORD_NO_THREAD_CHANNELS <channel_id>`, restart.
 3. `hermes profile delete proj-<slug> --yes` (removes the workspace too).
 4. Only if the owner asks to erase memory: `hindsight bank delete proj-<slug> -y`.
 5. Ask the owner to delete the channel and role in Discord, and the fork on GitHub if they want.

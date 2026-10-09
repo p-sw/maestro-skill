@@ -36,7 +36,7 @@ Facts MAESTRO relies on. Hermes and Hindsight move fast; when a command errors, 
 
   Match score: `user_id` 16, `thread_id` 8, `chat_id` 4, `guild_id` 2; the most specific wins. Unmatched traffic stays with the default profile (MAESTRO). A route whose target profile is missing is rejected, not sent to MAESTRO. Manage it with `maestro_ctl.py routes ...`.
 - Authorization for routed messages is decided by the receiving bot's profile (the default one): `DISCORD_ALLOWED_USERS` / `DISCORD_ALLOWED_ROLES` in the default profile's `.env`. The routed profile needs no allowlist of its own.
-- Useful Discord `.env` lists (comma-separated ids, default profile): `DISCORD_ALLOWED_USERS`, `DISCORD_ALLOWED_ROLES`, `DISCORD_FREE_RESPONSE_CHANNELS` (answer without @mention), `DISCORD_IGNORED_CHANNELS`, `DISCORD_NO_THREAD_CHANNELS`. Manage them with `maestro_ctl.py env-list ...`.
+- Useful Discord `.env` lists (comma-separated ids, default profile): `DISCORD_ALLOWED_USERS`, `DISCORD_ALLOWED_ROLES`, `DISCORD_FREE_RESPONSE_CHANNELS` (answer without @mention; not used for project channels, which require a mention), `DISCORD_NO_THREAD_CHANNELS` (answer in the channel instead of opening a thread; set for every project channel), `DISCORD_IGNORED_CHANNELS`, `DISCORD_NO_THREAD_CHANNELS`. Manage them with `maestro_ctl.py env-list ...`.
 
 ## Hindsight memory provider (Hermes plugin)
 
@@ -60,3 +60,5 @@ Uses `HINDSIGHT_API_URL` and `HINDSIGHT_API_KEY` from the environment. Add `-o j
 | Store a memory | `hindsight memory retain <bank_id> "<text>" --context "<label>" [--doc-id <id>]` |
 | Add a standing directive | `hindsight directive create <bank_id> "<name>" "<content>" [--priority N]` |
 | Delete bank (irreversible) | `hindsight bank delete <bank_id> -y` |
+
+- Per-profile Discord behaviour lives in the profile's `config.yaml`: `discord.require_mention` and `discord.auto_thread` (a served profile's values stay with that profile and are not bridged into the default profile's environment). Project agents run with `require_mention: true`, `auto_thread: false`.
